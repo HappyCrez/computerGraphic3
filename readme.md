@@ -3,4 +3,4 @@
 
 Программа написана на JavaScript и работает напрямую в браузере
 
-![Пример работы программы](https://github.com/HappyCrez/computerGraphic3/master/assets/v_0.1.png)
+![Пример работы программы](https://github.com/HappyCrez/computerGraphic3/tree/master/assets/v_0.1.png)
