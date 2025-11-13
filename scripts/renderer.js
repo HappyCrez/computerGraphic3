@@ -1,5 +1,5 @@
-import  { getXbyY, productMatrices, dotProductVectors, crossProductVectors, rotateMatrix, lengthVector, rad2deg, scaleMatrix, normalizeVector } from './mathematic.js';
-import { generateRotationFigure, calculateVertexNormals } from './geometry.js';
+import  { getXbyY, productMatrices, dotProductVectors, crossProductVectors, rotateMatrix, lengthVector, scaleMatrix, normalizeVector, linearInterpolation } from './mathematic.js';
+import { generateRotationFigure, calculateNormalsInVerteces } from './geometry.js';
 import { calculateGouraudColor } from './lighting.js';
 
 export function createRenderer() {
@@ -20,7 +20,7 @@ export function createRenderer() {
         height: 0,
         geometry: null,
         normals: null,
-        lightDirection: normalizeVector([-1,-1,-1]),
+        lightDirection: normalizeVector([1,1,-2]),
         cameraPositions: [
             [0, 1, 1],
             [10, 1, 1]
@@ -123,9 +123,7 @@ export function projectVertex(renderer, vertex) {
 
 export function transformVertex(vertex, transformMatrix) {
     const transformed = productMatrices([[...vertex,1]],transformMatrix)[0];
-    transformed[0] /= transformed[3];
-    transformed[1] /= transformed[3];
-    return transformed;
+    return [transformed[0]/transformed[3], transformed[1]/transformed[3], transformed[2]/transformed[3]];
 }
 
 export function drawGouraudTriangle(renderer, v1, v2, v3, c1, c2, c3) {
@@ -182,14 +180,30 @@ export function drawGouraudTriangle(renderer, v1, v2, v3, c1, c2, c3) {
 }
 
 // renderer - параметры для отрисовки на дисплей
-// e0, e1 - рёбра заданные двумя точками [[x0,y0], [x1,y1]]
+// e0, e1 - рёбра заданные двумя точками [[x0,y0,I0], [x1,y1,I1]]
+// Каждая точка дополнительно характеризуется интенсивностью
 export function drawBetweenTwoEdges(ctx, e0, e1) {
     const yMax = Math.ceil(Math.min(Math.max(e0[0][1], e0[1][1]), Math.max(e1[0][1],e1[1][1])));
     const yMin = Math.ceil(Math.max(Math.min(e0[0][1], e0[1][1]), Math.min(e1[0][1],e1[1][1])));
+
+    const e0Imin = Math.min(e0[0][2],e0[1][2]);
+    const e0Imax = Math.max(e0[0][2],e0[1][2]);
+    const e1Imin = Math.min(e1[0][2],e1[1][2]);
+    const e1Imax = Math.max(e1[0][2],e1[1][2]);
     for (let y = yMin; y < yMax; ++y) {
         const x0 = Math.trunc(getXbyY(e0,y));
         const x1 = Math.trunc(getXbyY(e1,y));
+
+        // Интерполируем линейно интенсивность в точках [x0,y] и [x1,y]
+        const Iq = linearInterpolation([x0,y],e0);
+        const Ir = linearInterpolation([x1,y],e1);
+
         for (let x = Math.min(x0,x1); x < Math.max(x0,x1); ++x) {
+            const intensity = linearInterpolation([x,y],[[x0,y,Iq],[x1,y,Ir]]);
+            
+            // console.log([x-Math.min(x0,x1), Math.abs(x0-x1)]);
+            const color = Math.min(255, Math.max(0, Math.floor(intensity * 255)));
+            ctx.fillStyle = `rgb(${color},${color},${color})`;
             ctx.fillRect(x,y,1,1);
         }
     }
@@ -229,48 +243,55 @@ export function render(renderer) {
 
     drawAxios(renderer);
 
-    const scaledMatrix = scaleMatrix(0.25, 0.25, 0.25);    
-    const rotationMatrix = rotateMatrix(renderer.rotationX, renderer.rotationY, 0);
-    const transformMatrix = productMatrices(productMatrices(scaledMatrix, rotationMatrix), renderer.proectionMatrix);
-    const vertecesTransformed = renderer.geometry.vertices.map(row => row.slice());
-    vertecesTransformed.forEach((_,i,arr) => {
-        arr[i].push(1);
-        arr[i] = productMatrices([arr[i]],transformMatrix)[0];
-        arr[i][0] = (arr[i][0]/arr[i][3] + 1) * renderer.width / 2;
-        arr[i][1] = (1 - arr[i][1]/arr[i][3]) * renderer.height / 2;
-    });
+    const modelMatrix = productMatrices(
+        scaleMatrix(0.25, 0.25, 0.25),
+        rotateMatrix(renderer.rotationX, renderer.rotationY, 0)
+    );
 
-    const vertecesRotated = renderer.geometry.vertices.map(row => row.slice());
-    vertecesRotated.forEach((_,i,list)=>{
-        list[i] = transformVertex(list[i], productMatrices(scaledMatrix, rotationMatrix));
+    const modelV = renderer.geometry.vertices.map(row => row.slice())
+    modelV.forEach((_,i,list)=>{
+        list[i] = transformVertex(list[i], modelMatrix);
     });
 
     const triangles = renderer.geometry.triangles;
-    for (let i = 0; i < triangles.length; ++i) {
-        const triangle = triangles[i];
-        const i1 = triangle[0];
-        const i2 = triangle[1];
-        const i3 = triangle[2];
-        
-        const edge1 = [vertecesRotated[i2][0] - vertecesRotated[i1][0], vertecesRotated[i2][1] - vertecesRotated[i1][1], vertecesRotated[i2][2] - vertecesRotated[i1][2]];
-        const edge2 = [vertecesRotated[i3][0] - vertecesRotated[i1][0], vertecesRotated[i3][1] - vertecesRotated[i1][1], vertecesRotated[i3][2] - vertecesRotated[i1][2]];
-        
-        const triangleNormal = normalizeVector(crossProductVectors(edge2, edge1));
+    
+    // Считаем нормали в вершинах с учетом применения аффинных преобразований
+    const normalV = calculateNormalsInVerteces(modelV, triangles);
 
-        // Считаем угол между нормалями
+    // Считаем нормаль каждого треугольника, она будет нужна для проверки видим мы данный треугольник или нет
+    const normalT = triangles.map((triangle) => {
+        const edge1 = [modelV[triangle[1]][0] - modelV[triangle[0]][0], modelV[triangle[1]][1] - modelV[triangle[0]][1], modelV[triangle[1]][2] - modelV[triangle[0]][2]];
+        const edge2 = [modelV[triangle[2]][0] - modelV[triangle[0]][0], modelV[triangle[2]][1] - modelV[triangle[0]][1], modelV[triangle[2]][2] - modelV[triangle[0]][2]];
+        return normalizeVector(crossProductVectors(edge1, edge2));
+    });
+
+    // Проводим проекцию вершин и дополняем информацию о каждой вершине интенсивностью в ней
+    modelV.forEach((_,i,list)=>{
+        list[i] = transformVertex(list[i], renderer.proectionMatrix);
+        list[i].pop(); // После проекции координату z убираем
+        list[i][0] = (list[i][0]+1) * renderer.width / 2;
+        list[i][1] = (1-list[i][1]) * renderer.height / 2;
+        list[i].push(calculateGouraudColor(normalV[i], renderer.viewDirection, renderer.lightDirection));
+    });
+
+    for (let i = 0; i < triangles.length; ++i) {
+        const i1 = triangles[i][0];
+        const i2 = triangles[i][1];
+        const i3 = triangles[i][2];
+
+        // Проверяем угол между нормалями треугольника и направления взгляда
         // cosA = (a*b)/(|a|*|b|)
         // Angle = arccos(cosA)
-        const angle = rad2deg(Math.abs(Math.acos(dotProductVectors(triangleNormal, renderer.viewDirection)/(lengthVector(triangleNormal) * lengthVector(renderer.viewDirection)))));
-        if (angle > 90) { // Этот треугольник не виден
+        const angle = Math.abs( Math.acos(
+                    dotProductVectors(normalT[i], renderer.viewDirection) /             //  (a*b)
+                    (lengthVector(normalT[i]) * lengthVector(renderer.viewDirection))));// |a|*|b|
+        if (angle > Math.PI/2) { // Этот треугольник не виден
             continue;
         }
-
-        const color = calculateGouraudColor(triangleNormal, renderer.viewDirection, renderer.lightDirection);
-        ctx.fillStyle = `rgb(${color}, ${color}, ${color})`;
-        // Отрисовываем треугольник, последовательно заполняя пространство
-        drawBetweenTwoEdges(ctx, [vertecesTransformed[i1], vertecesTransformed[i2]], [vertecesTransformed[i1], vertecesTransformed[i3]]); 
-        drawBetweenTwoEdges(ctx, [vertecesTransformed[i1], vertecesTransformed[i2]], [vertecesTransformed[i2], vertecesTransformed[i3]]);
-        drawBetweenTwoEdges(ctx, [vertecesTransformed[i1], vertecesTransformed[i3]], [vertecesTransformed[i2], vertecesTransformed[i3]]);
+        // Отрисовываем треугольник
+        drawBetweenTwoEdges(ctx, [modelV[i1],modelV[i2]], [modelV[i1],modelV[i3]]);
+        drawBetweenTwoEdges(ctx, [modelV[i1],modelV[i2]], [modelV[i2],modelV[i3]]);
+        drawBetweenTwoEdges(ctx, [modelV[i1],modelV[i3]], [modelV[i2],modelV[i3]]);
     }
 }
 

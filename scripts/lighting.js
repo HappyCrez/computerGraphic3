@@ -6,8 +6,8 @@ import { dotProductVectors } from './mathematic.js';
 export function calculateGouraudColor(triangleNormal, viewDirection, lightDirection) {
     const ambient = 0.2;
     const diffuse = 0.7;
-    const specular = 0.1;
-    const shininess = 32;
+    const specular = 0.2;
+    const shininess = 12;
     
     // Диффузная составляющая - косинус угла между нормалью и направлением света
     const lightDot = Math.max(0, dotProductVectors(triangleNormal, lightDirection));
@@ -24,6 +24,5 @@ export function calculateGouraudColor(triangleNormal, viewDirection, lightDirect
     const specularFactor = Math.pow(specularDot, shininess);
     
     // Итоговая интенсивность
-    const intensity = ambient + diffuse * lightDot + specular * specularFactor;
-    return Math.min(255, Math.max(0, Math.floor(intensity * 255)));
+    return ambient + diffuse * lightDot + specular * specularFactor;
 }

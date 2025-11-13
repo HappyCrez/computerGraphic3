@@ -44,7 +44,7 @@ export function generateRotationFigure(curvePoints, segments) {
     return { vertices, triangles };
 }
 
-export function calculateVertexNormals(vertices, triangles) {
+export function calculateNormalsInVerteces(vertices, triangles) {
     const normals = Array(vertices.length).fill(0).map(() => Array(3).fill(0));
     for (let i = 0; i < triangles.length; i++) {
         const triangle = triangles[i];

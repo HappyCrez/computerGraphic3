@@ -125,3 +125,27 @@ export function getXbyY(edge, y) {
     const b = edge[0][1] - k*edge[0][0];
     return (y-b)/k;
 }
+
+export function linearInterpolation(v, points) {
+    const [[x0, y0, I0], [x1, y1, I1]] = points;
+    
+    // Вычисляем параметр t через проекцию на вектор отрезка
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const lengthSq = dx * dx + dy * dy;
+    
+    // Если точки совпадают, возвращаем среднее значение
+    if (lengthSq === 0) {
+        return (I0 + I1) / 2;
+    }
+    
+    // Вектор от начальной точки к целевой
+    const vx = v[0] - x0;
+    const vy = v[1] - y0;
+    
+    // Проекция на направляющий вектор отрезка
+    const t = (vx * dx + vy * dy) / lengthSq;
+    
+    // Линейная интерполяция
+    return (1 - t) * I0 + t * I1;
+}
