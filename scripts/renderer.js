@@ -1,7 +1,8 @@
-import  { getXbyY, productMatrices, dotProductVectors, crossProductVectors, rotateMatrix, lengthVector, scaleMatrix, normalizeVector, linearInterpolation } from './mathematic.js';
+import  { getXbyY, productMatrices, dotProductVectors, crossProductVectors, rotateMatrix, lengthVector, scaleMatrix, normalizeVector, linearInterpolation, identityMatrix } from './mathematic.js';
 import { generateRotationFigure, calculateNormalsInVerteces } from './geometry.js';
-import { calculateGouraudColor } from './lighting.js';
+import { getColorIntensity } from './lighting.js';
 
+// Объект изменяемого состояния
 export function createRenderer() {
     const canvas = document.getElementById('canvas');
     if (!canvas) {
@@ -35,6 +36,8 @@ export function createRenderer() {
         lastY: 0,
         viewDirection: normalizeVector([0,0,-1]), // Направление взгляда
         isSceneSetuped: false,
+        
+        // Матрицы преобразования
         proectionMatrix: [ // Ортогональная проекция
             [1, 0, 0, 0],
             [0, 1, 0, 0],
@@ -44,6 +47,7 @@ export function createRenderer() {
     };
 }
 
+// Инициализируем размеры canvas
 export function setupCanvas(renderer) {
     renderer.canvas.width = window.innerWidth;
     renderer.canvas.height = window.innerHeight;
@@ -51,6 +55,9 @@ export function setupCanvas(renderer) {
     renderer.height = renderer.canvas.height;
 }
 
+// Генерирует окружность в виде набора точек в массив array
+// circles - количество точек окружности в одной четверти графика
+// array - выходной параметр (набор точек окружности)
 function generateSphere(circles, array) {
     for (let i = -circles/2; i <= circles/2; i++) {
         const angle = (i * Math.PI) / circles; // от 0 до π радиан
@@ -60,6 +67,7 @@ function generateSphere(circles, array) {
     }
 }
 
+// Создает фигуру для мира
 export function setupScene(renderer) {
     const curvePoints = [];
     generateSphere(36, curvePoints);
@@ -68,6 +76,7 @@ export function setupScene(renderer) {
     renderer.isSceneSetuped = true;
 }
 
+// Обработка событий окна
 export function setupEventListeners(renderer) {
     renderer.canvas.addEventListener('mousedown', function(e) {
         renderer.isDragging = true;
@@ -102,81 +111,22 @@ export function setupEventListeners(renderer) {
     
     window.addEventListener('resize', function() {
         setupCanvas(renderer);
+        updateScene(renderer);
     });
 }
 
-export function projectVertex(renderer, vertex) {
-    if (!vertex) return [0, 0];
-    
-    const scale = 80;
-    const z = vertex[2] + 10;
-    
-    if (z <= 0) return [0, 0];
-    
-    const factor = 400 / z;
-    
-    return [
-        renderer.width / 2 + vertex[0] * factor * scale,
-        renderer.height / 2 - vertex[1] * factor * scale
-    ];
-}
-
+// Умножает вектор строку на матрицу преобразования
+// Возвращает результирующий вектор
 export function transformVertex(vertex, transformMatrix) {
     const transformed = productMatrices([[...vertex,1]],transformMatrix)[0];
     return [transformed[0]/transformed[3], transformed[1]/transformed[3], transformed[2]/transformed[3]];
 }
 
-export function drawGouraudTriangle(renderer, v1, v2, v3, c1, c2, c3) {
-    if (!v1 || !v2 || !v3) return;
-    
-    const vertices = [
-        { x: v1[0], y: v1[1], color: c1 },
-        { x: v2[0], y: v2[1], color: c2 },
-        { x: v3[0], y: v3[1], color: c3 }
-    ];
-    
-    vertices.sort((a, b) => a.y - b.y);
-    
-    const minY = Math.max(0, Math.floor(vertices[0].y));
-    const midY = Math.floor(vertices[1].y);
-    const maxY = Math.min(renderer.height, Math.floor(vertices[2].y));
-    
-    for (let y = minY; y <= maxY; y++) {
-        let x1, x2, color1, color2;
-        
-        if (y < midY) {
-            const t = (y - vertices[0].y) / (vertices[1].y - vertices[0].y);
-            x1 = vertices[0].x + (vertices[1].x - vertices[0].x) * t;
-            x2 = vertices[0].x + (vertices[2].x - vertices[0].x) * t;
-            color1 = vertices[0].color + (vertices[1].color - vertices[0].color) * t;
-            color2 = vertices[0].color + (vertices[2].color - vertices[0].color) * t;
-        } else {
-            if (vertices[2].y === vertices[1].y) continue;
-            const t = (y - vertices[1].y) / (vertices[2].y - vertices[1].y);
-            x1 = vertices[1].x + (vertices[2].x - vertices[1].x) * t;
-            x2 = vertices[0].x + (vertices[2].x - vertices[0].x) * t;
-            color1 = vertices[1].color + (vertices[2].color - vertices[1].color) * t;
-            color2 = vertices[0].color + (vertices[2].color - vertices[0].color) * t;
-        }
-        
-        if (x1 > x2) {
-            [x1, x2] = [x2, x1];
-            [color1, color2] = [color2, color1];
-        }
-        
-        const startX = Math.max(0, Math.floor(x1));
-        const endX = Math.min(renderer.width, Math.floor(x2));
-        
-        for (let x = startX; x <= endX; x++) {
-            if (x2 === x1) continue;
-            
-            const t = (x - x1) / (x2 - x1);
-            const color = Math.round(color1 + (color2 - color1) * t);
-            
-            renderer.ctx.fillStyle = `rgb(${color}, ${color}, ${color})`;
-            renderer.ctx.fillRect(x, y, 1, 1);
-        }
-    }
+// Проецируем вершину на экран
+// v - вершина для проецирования задается в формате [x,y]
+export function proectVertexOnScreen(renderer, v) {
+    v = transformVertex(v, renderer.proectionMatrix);
+    return [(v[0] + 1) * renderer.width / 2, (1 - v[1]) * renderer.height / 2];
 }
 
 // renderer - параметры для отрисовки на дисплей
@@ -186,10 +136,6 @@ export function drawBetweenTwoEdges(ctx, e0, e1) {
     const yMax = Math.ceil(Math.min(Math.max(e0[0][1], e0[1][1]), Math.max(e1[0][1],e1[1][1])));
     const yMin = Math.ceil(Math.max(Math.min(e0[0][1], e0[1][1]), Math.min(e1[0][1],e1[1][1])));
 
-    const e0Imin = Math.min(e0[0][2],e0[1][2]);
-    const e0Imax = Math.max(e0[0][2],e0[1][2]);
-    const e1Imin = Math.min(e1[0][2],e1[1][2]);
-    const e1Imax = Math.max(e1[0][2],e1[1][2]);
     for (let y = yMin; y < yMax; ++y) {
         const x0 = Math.trunc(getXbyY(e0,y));
         const x1 = Math.trunc(getXbyY(e1,y));
@@ -209,23 +155,17 @@ export function drawBetweenTwoEdges(ctx, e0, e1) {
     }
 }
 
+// Рисует на экране оси в мировом пространстве
 export function drawAxios(renderer) {
     const axios = [
-        [[-1,0,0],[1,0,0]], // X
-        [[0,-1,0],[0,1,0]], // Y
-        [[0,0,-3],[0,0,3]]  // Z
+        [[-1,0,0],[1,0,0]], // X (red)
+        [[0,-1,0],[0,1,0]], // Y (green)
+        [[0,0,-3],[0,0,3]]  // Z (blue)
     ];
-    axios.forEach((_,i,axis) => {
-        axis[i].forEach((_,j,v) => {
-            v[j].push(1);
-            v[j] = productMatrices([v[j]], renderer.proectionMatrix)[0];
-            
-            v[j][0] = (v[j][0]/v[j][3] + 1) * renderer.width / 2;
-            v[j][1] = (1 - v[j][1]/v[j][3]) * renderer.height / 2;
-        });
-    });
-
     axios.forEach((axis,i) => {
+        axis.forEach((_,j,v) => {
+            v[j] = proectVertexOnScreen(renderer,v[j]);
+        });
         renderer.ctx.beginPath();
         renderer.ctx.strokeStyle = i===0? 'red' : (i===1? 'green' : 'blue');
         renderer.ctx.moveTo(axis[0][0], axis[0][1]);
@@ -267,11 +207,8 @@ export function render(renderer) {
 
     // Проводим проекцию вершин и дополняем информацию о каждой вершине интенсивностью в ней
     modelV.forEach((_,i,list)=>{
-        list[i] = transformVertex(list[i], renderer.proectionMatrix);
-        list[i].pop(); // После проекции координату z убираем
-        list[i][0] = (list[i][0]+1) * renderer.width / 2;
-        list[i][1] = (1-list[i][1]) * renderer.height / 2;
-        list[i].push(calculateGouraudColor(normalV[i], renderer.viewDirection, renderer.lightDirection));
+        list[i] = proectVertexOnScreen(renderer,list[i]);
+        list[i].push(getColorIntensity(normalV[i], renderer.viewDirection, renderer.lightDirection));
     });
 
     for (let i = 0; i < triangles.length; ++i) {
