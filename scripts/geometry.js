@@ -15,12 +15,10 @@ export function generateRotationFigure(curvePoints, segments) {
     const vertices = [];
     for (let i = 0; i < segments; i++) {
         const angle = (i / segments) * 360;
-        const cos = Math.cos(deg2rad(angle));
-        const sin = Math.sin(deg2rad(angle));
-        
+
         for (let j = 0; j < curvePoints.length; j++) {
             const point = curvePoints[j];
-            const vertex = [point[0] * cos, point[1], point[0] * sin];
+            const vertex = [point[0] * Math.cos(deg2rad(angle)), point[1], point[0] * Math.sin(deg2rad(angle))];
             vertices.push(vertex);
         }
     }
@@ -33,7 +31,7 @@ export function generateRotationFigure(curvePoints, segments) {
             const a = i * pointsPerCircle + j;
             const b = i * pointsPerCircle + j + 1;
 
-            const next_i = (i + 1) % segments; // с учетом замыкания
+            const next_i = (i + 1) % segments;
             const c = next_i * pointsPerCircle + j;
             const d = next_i * pointsPerCircle + j + 1;
             
