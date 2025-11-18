@@ -1,10 +1,11 @@
 import { 
     createRenderer, 
     setupCanvas, 
-    setupScene, 
-    setupEventListeners, 
+    setupScene,
     updateScene 
 } from './renderer.js';
+
+import { setupEventListeners } from './listeners.js'
 
 async function init() {
     try {
@@ -28,7 +29,7 @@ async function init() {
         canvas.style.display = 'block';
         infoElement.style.display = 'block';
         
-        // Отрисовываем сцену
+        // Запускаем анимацию -> отрисовка сцены
         updateScene(renderer);
         
     } catch (error) {

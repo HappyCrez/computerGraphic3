@@ -21,28 +21,24 @@ export function createRenderer() {
         height: 0,
         geometry: null,
         normals: null,
-        lightDirection: normalizeVector([-1,1,1]),
-        cameraPositions: [
-            [0, 0, -10],
-            [1, 1, -1]
-        ],
-        cameraIdx: 0,
-        cameraProgress: 0,
-        cameraSpeed: 0.002,
+        lightDirection: normalizeVector([2,2,-1]),
 
-        rotationX: 120,
-        rotationY: 70,
+        rotationX: 30,
+        rotationY: 30,
         isDragging: false,
         lastX: 0,
         lastY: 0,
+        distance: 10,
         isSceneSetuped: false,
         
         // Матрицы преобразования
+        // Матрица вида
         viewUp: [0,1,0],
         viewTarget: [0,0,0],
         viewPosition: [0,0,-1],
         viewMatrix: identityMatrix(),
 
+        // Матрица проекции
         fov: 60,
         near: 0.1,
         far: 100,
@@ -50,6 +46,7 @@ export function createRenderer() {
     };
 }
 
+// Пересчитывает матрицу вида
 export function updateViewMatrix(renderer) {
     const z = normalizeVector([
         renderer.viewPosition[0] - renderer.viewTarget[0],
@@ -68,6 +65,7 @@ export function updateViewMatrix(renderer) {
     ];
 }
 
+// Пересчитывает матрицу проекции
 export function updatePerspectiveMatrix(renderer) {
     const aspect = renderer.width/renderer.height;
     const f = 1.0 / Math.tan(deg2rad(renderer.fov) / 2);
@@ -105,63 +103,11 @@ function generateSphere(circles, array) {
 
 // Создает фигуру для мира
 export function setupScene(renderer) {
-    const curvePoints = [
-        // [1, 0],
-        // [1, 1]
-    ];
+    const curvePoints = [];
     generateSphere(36, curvePoints);
 
     renderer.geometry = generateRotationFigure(curvePoints, 36);
     renderer.isSceneSetuped = true;
-}
-
-// Обработка событий окна
-export function setupEventListeners(renderer) {
-    renderer.canvas.addEventListener('mousedown', function(e) {
-        renderer.isDragging = true;
-        renderer.lastX = e.clientX;
-        renderer.lastY = e.clientY;
-        renderer.canvas.style.cursor = 'grabbing';
-    });
-    
-    renderer.canvas.addEventListener('mousemove', function(e) {
-        if (!renderer.isDragging) return;
-        
-        const deltaX = e.clientX - renderer.lastX;
-        const deltaY = e.clientY - renderer.lastY;
-        
-        renderer.rotationY += deltaX * 0.5;
-        renderer.rotationX -= deltaY * 0.5;
-
-        renderer.rotationY = Math.min(Math.max(0, renderer.rotationY), 180);
-        renderer.rotationX = Math.min(Math.max(90, renderer.rotationX), 180);
-
-        renderer.lastX = e.clientX;
-        renderer.lastY = e.clientY;
-        updateScene(renderer);
-    });
-    
-    renderer.canvas.addEventListener('mouseup', function() {
-        renderer.isDragging = false;
-        renderer.canvas.style.cursor = 'grab';
-    });
-    
-    renderer.canvas.addEventListener('mouseleave', function() {
-        renderer.isDragging = false;
-        renderer.canvas.style.cursor = 'grab';
-    });
-
-    window.addEventListener('keydown', function(e) {
-        const cameraSpeed = 1.5;
-        // if (e.key == 'ArrowLeft') 
-        // else if (e.key == 'ArrowRight') 
-        updateScene(renderer);
-    });
-    
-    window.addEventListener('resize', function() {
-        setupCanvas(renderer);
-        updateScene(renderer);
-    });
 }
 
 // Умножает вектор строку на матрицу преобразования
@@ -202,7 +148,7 @@ export function drawBetweenTwoEdges(renderer, e0, e1) {
     }
 }
 
-// Рисует на экране оси в мировом пространстве
+// Рисует на экране оси
 export function drawAxios(renderer) {
     const axios = [
         [[-5,0,0],[5,0,0]], // X (red)
@@ -229,13 +175,16 @@ export function render(renderer) {
     ctx.fillStyle = '#eee';
     ctx.fillRect(0, 0, renderer.width, renderer.height);
 
-    const cameraPosition = renderer.cameraPositions[0];
     renderer.viewPosition = [
-        cameraPosition[0] + lengthVector(cameraPosition) * Math.cos(deg2rad(renderer.rotationY)),
-        cameraPosition[1] + lengthVector(cameraPosition) * Math.cos(deg2rad(renderer.rotationX)),
-        cameraPosition[2] + lengthVector(cameraPosition) * Math.cos(deg2rad(renderer.rotationX)) * Math.sin(deg2rad(renderer.rotationY))
+        renderer.distance * Math.cos(deg2rad(renderer.rotationY)) * Math.sin(deg2rad(renderer.rotationX)),
+        renderer.distance * Math.sin(deg2rad(renderer.rotationY)),
+        renderer.distance * Math.cos(deg2rad(renderer.rotationY)) * Math.cos(deg2rad(renderer.rotationX))
     ];
-    const viewDirection = normalizeVector([-renderer.viewPosition[0], -renderer.viewPosition[1], -renderer.viewPosition[2]]);
+    const viewDirection = normalizeVector([
+        renderer.viewPosition[0] - renderer.viewTarget[0],
+        renderer.viewPosition[1] - renderer.viewTarget[1],
+        renderer.viewPosition[2] - renderer.viewTarget[2]
+    ]);
     updateViewMatrix(renderer);
 
     drawAxios(renderer);
@@ -288,9 +237,11 @@ export function render(renderer) {
     }
 }
 
+// Запускает цикл анимации
 export function updateScene(renderer) {
     if (renderer.isSceneSetuped === false) {
         return;
     }
     render(renderer);
+    window.requestAnimationFrame(() => updateScene(renderer));
 }
