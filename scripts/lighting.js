@@ -7,8 +7,8 @@ import { dotProductVectors } from './mathematic.js';
 export function getColorIntensity(normal, viewDirection, lightDirection) {
     const ambient = 0.2; // Коэффициент окружающего освещения
     const diffuse = 0.7; // Коэффициент "матовости"
-    const specular = 0.2; // Коэффициент зеркальности (шерховатость поверхности)
-    const phoeng = 12; // Коэффициент Фонга (качество полировки)
+    const specular = 0.3; // Коэффициент зеркальности (шерховатость поверхности)
+    const phoeng = 16; // Коэффициент Фонга (качество полировки)
     
     // Диффузная составляющая - косинус угла между нормалью и направлением света
     const lightDot = Math.max(0, dotProductVectors(normal, lightDirection));

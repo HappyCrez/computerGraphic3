@@ -1,4 +1,4 @@
-import  { getXbyY, productMatrices, dotProductVectors, crossProductVectors, rotateMatrix, lengthVector, scaleMatrix, normalizeVector, linearInterpolation, identityMatrix } from './mathematic.js';
+import  { getXbyY, productMatrices, dotProductVectors, crossProductVectors, rotateMatrix, lengthVector, scaleMatrix, normalizeVector, linearInterpolation, identityMatrix, deg2rad, rad2deg } from './mathematic.js';
 import { generateRotationFigure, calculateNormalsInVerteces } from './geometry.js';
 import { getColorIntensity } from './lighting.js';
 
@@ -21,30 +21,64 @@ export function createRenderer() {
         height: 0,
         geometry: null,
         normals: null,
-        lightDirection: normalizeVector([1,1,-2]),
+        lightDirection: normalizeVector([-1,1,1]),
         cameraPositions: [
-            [0, 1, 1],
-            [10, 1, 1]
+            [0, 0, -10],
+            [1, 1, -1]
         ],
-        currentCameraIndex: 0,
+        cameraIdx: 0,
         cameraProgress: 0,
         cameraSpeed: 0.002,
-        rotationX: -20,
-        rotationY: 20,
+
+        rotationX: 120,
+        rotationY: 70,
         isDragging: false,
         lastX: 0,
         lastY: 0,
-        viewDirection: normalizeVector([0,0,-1]), // Направление взгляда
         isSceneSetuped: false,
         
         // Матрицы преобразования
-        proectionMatrix: [ // Ортогональная проекция
-            [1, 0, 0, 0],
-            [0, 1, 0, 0],
-            [0, 0, 0, 0],
-            [0, 0, 0, 1]
-        ]
+        viewUp: [0,1,0],
+        viewTarget: [0,0,0],
+        viewPosition: [0,0,-1],
+        viewMatrix: identityMatrix(),
+
+        fov: 60,
+        near: 0.1,
+        far: 100,
+        proectionMatrix: identityMatrix()
     };
+}
+
+export function updateViewMatrix(renderer) {
+    const z = normalizeVector([
+        renderer.viewPosition[0] - renderer.viewTarget[0],
+        renderer.viewPosition[1] - renderer.viewTarget[1],
+        renderer.viewPosition[2] - renderer.viewTarget[2]
+    ]);
+    
+    const x = normalizeVector(crossProductVectors(renderer.viewUp, z));
+    const y = normalizeVector(crossProductVectors(z, x));
+
+    renderer.viewMatrix = [
+        [x[0], y[0], z[0], 0],
+        [x[1], y[1], z[1], 0],
+        [x[2], y[2], z[2], 0],
+        [-dotProductVectors(x, renderer.viewPosition), -dotProductVectors(y, renderer.viewPosition), -dotProductVectors(z, renderer.viewPosition), 1]
+    ];
+}
+
+export function updatePerspectiveMatrix(renderer) {
+    const aspect = renderer.width/renderer.height;
+    const f = 1.0 / Math.tan(deg2rad(renderer.fov) / 2);
+    const rangeInv = 1.0 / (renderer.near - renderer.far);
+    
+    renderer.proectionMatrix = [
+        [f / aspect, 0, 0, 0],
+        [0, f, 0, 0],
+        [0, 0, (renderer.far + renderer.near) * rangeInv, 2 * renderer.far * renderer.near * rangeInv],
+        [0, 0, -1, 0]
+    ];
 }
 
 // Инициализируем размеры canvas
@@ -53,6 +87,8 @@ export function setupCanvas(renderer) {
     renderer.canvas.height = window.innerHeight;
     renderer.width = renderer.canvas.width;
     renderer.height = renderer.canvas.height;
+
+    updatePerspectiveMatrix(renderer);
 }
 
 // Генерирует окружность в виде набора точек в массив array
@@ -69,7 +105,10 @@ function generateSphere(circles, array) {
 
 // Создает фигуру для мира
 export function setupScene(renderer) {
-    const curvePoints = [];
+    const curvePoints = [
+        // [1, 0],
+        // [1, 1]
+    ];
     generateSphere(36, curvePoints);
 
     renderer.geometry = generateRotationFigure(curvePoints, 36);
@@ -93,7 +132,10 @@ export function setupEventListeners(renderer) {
         
         renderer.rotationY += deltaX * 0.5;
         renderer.rotationX -= deltaY * 0.5;
-        
+
+        renderer.rotationY = Math.min(Math.max(0, renderer.rotationY), 180);
+        renderer.rotationX = Math.min(Math.max(90, renderer.rotationX), 180);
+
         renderer.lastX = e.clientX;
         renderer.lastY = e.clientY;
         updateScene(renderer);
@@ -107,6 +149,13 @@ export function setupEventListeners(renderer) {
     renderer.canvas.addEventListener('mouseleave', function() {
         renderer.isDragging = false;
         renderer.canvas.style.cursor = 'grab';
+    });
+
+    window.addEventListener('keydown', function(e) {
+        const cameraSpeed = 1.5;
+        // if (e.key == 'ArrowLeft') 
+        // else if (e.key == 'ArrowRight') 
+        updateScene(renderer);
     });
     
     window.addEventListener('resize', function() {
@@ -125,16 +174,15 @@ export function transformVertex(vertex, transformMatrix) {
 // Проецируем вершину на экран
 // v - вершина для проецирования задается в формате [x,y]
 export function proectVertexOnScreen(renderer, v) {
-    v = transformVertex(v, renderer.proectionMatrix);
     return [(v[0] + 1) * renderer.width / 2, (1 - v[1]) * renderer.height / 2];
 }
 
 // renderer - параметры для отрисовки на дисплей
 // e0, e1 - рёбра заданные двумя точками [[x0,y0,I0], [x1,y1,I1]]
 // Каждая точка дополнительно характеризуется интенсивностью
-export function drawBetweenTwoEdges(ctx, e0, e1) {
-    const yMax = Math.ceil(Math.min(Math.max(e0[0][1], e0[1][1]), Math.max(e1[0][1],e1[1][1])));
-    const yMin = Math.ceil(Math.max(Math.min(e0[0][1], e0[1][1]), Math.min(e1[0][1],e1[1][1])));
+export function drawBetweenTwoEdges(renderer, e0, e1) {
+    const yMax = Math.ceil(Math.min(renderer.height, Math.max(e0[0][1], e0[1][1]), Math.max(e1[0][1],e1[1][1])));
+    const yMin = Math.ceil(Math.max(0, Math.min(e0[0][1], e0[1][1]), Math.min(e1[0][1],e1[1][1])));
 
     for (let y = yMin; y < yMax; ++y) {
         const x0 = Math.trunc(getXbyY(e0,y));
@@ -144,13 +192,12 @@ export function drawBetweenTwoEdges(ctx, e0, e1) {
         const Iq = linearInterpolation([x0,y],e0);
         const Ir = linearInterpolation([x1,y],e1);
 
-        for (let x = Math.min(x0,x1); x < Math.max(x0,x1); ++x) {
+        for (let x = Math.max(0,Math.min(x0,x1)); x < Math.min(renderer.width,Math.max(x0,x1)); ++x) {
             const intensity = linearInterpolation([x,y],[[x0,y,Iq],[x1,y,Ir]]);
             
-            // console.log([x-Math.min(x0,x1), Math.abs(x0-x1)]);
             const color = Math.min(255, Math.max(0, Math.floor(intensity * 255)));
-            ctx.fillStyle = `rgb(${color},${color},${color})`;
-            ctx.fillRect(x,y,1,1);
+            renderer.ctx.fillStyle = `rgb(${color},${color},${color})`;
+            renderer.ctx.fillRect(x,y,1,1);
         }
     }
 }
@@ -158,18 +205,19 @@ export function drawBetweenTwoEdges(ctx, e0, e1) {
 // Рисует на экране оси в мировом пространстве
 export function drawAxios(renderer) {
     const axios = [
-        [[-1,0,0],[1,0,0]], // X (red)
-        [[0,-1,0],[0,1,0]], // Y (green)
-        [[0,0,-3],[0,0,3]]  // Z (blue)
+        [[-5,0,0],[5,0,0]], // X (red)
+        [[0,-5,0],[0,5,0]], // Y (green)
+        [[0,0,-5],[0,0,5]]  // Z (blue)
     ];
     axios.forEach((axis,i) => {
         axis.forEach((_,j,v) => {
+            v[j] = transformVertex(v[j], productMatrices(renderer.viewMatrix, renderer.proectionMatrix));
             v[j] = proectVertexOnScreen(renderer,v[j]);
         });
         renderer.ctx.beginPath();
         renderer.ctx.strokeStyle = i===0? 'red' : (i===1? 'green' : 'blue');
-        renderer.ctx.moveTo(axis[0][0], axis[0][1]);
-        renderer.ctx.lineTo(axis[1][0], axis[1][1]);
+        renderer.ctx.moveTo(...axis[0]);
+        renderer.ctx.lineTo(...axis[1]);
         renderer.ctx.stroke();
         renderer.ctx.closePath();
     });
@@ -181,54 +229,62 @@ export function render(renderer) {
     ctx.fillStyle = '#eee';
     ctx.fillRect(0, 0, renderer.width, renderer.height);
 
+    const cameraPosition = renderer.cameraPositions[0];
+    renderer.viewPosition = [
+        cameraPosition[0] + lengthVector(cameraPosition) * Math.cos(deg2rad(renderer.rotationY)),
+        cameraPosition[1] + lengthVector(cameraPosition) * Math.cos(deg2rad(renderer.rotationX)),
+        cameraPosition[2] + lengthVector(cameraPosition) * Math.cos(deg2rad(renderer.rotationX)) * Math.sin(deg2rad(renderer.rotationY))
+    ];
+    const viewDirection = normalizeVector([-renderer.viewPosition[0], -renderer.viewPosition[1], -renderer.viewPosition[2]]);
+    updateViewMatrix(renderer);
+
     drawAxios(renderer);
 
-    const modelMatrix = productMatrices(
-        scaleMatrix(0.25, 0.25, 0.25),
-        rotateMatrix(renderer.rotationX, renderer.rotationY, 0)
-    );
-
-    const modelV = renderer.geometry.vertices.map(row => row.slice())
-    modelV.forEach((_,i,list)=>{
+    const modelMatrix = productMatrices(scaleMatrix(0.25, 0.25, 0.25), rotateMatrix(0, 0, 0));
+    const ndcV = renderer.geometry.vertices.map(row => row.slice());
+    ndcV.forEach((_,i,list)=>{
         list[i] = transformVertex(list[i], modelMatrix);
     });
 
+    // Каждый треугольник задается тремя индексами вершин, соответстсвующими вершинам в массиве вершин ndcV
     const triangles = renderer.geometry.triangles;
     
     // Считаем нормали в вершинах с учетом применения аффинных преобразований
-    const normalV = calculateNormalsInVerteces(modelV, triangles);
+    const normalV = calculateNormalsInVerteces(ndcV, triangles);
 
     // Считаем нормаль каждого треугольника, она будет нужна для проверки видим мы данный треугольник или нет
     const normalT = triangles.map((triangle) => {
-        const edge1 = [modelV[triangle[1]][0] - modelV[triangle[0]][0], modelV[triangle[1]][1] - modelV[triangle[0]][1], modelV[triangle[1]][2] - modelV[triangle[0]][2]];
-        const edge2 = [modelV[triangle[2]][0] - modelV[triangle[0]][0], modelV[triangle[2]][1] - modelV[triangle[0]][1], modelV[triangle[2]][2] - modelV[triangle[0]][2]];
-        return normalizeVector(crossProductVectors(edge1, edge2));
+        const edge1 = [ndcV[triangle[1]][0] - ndcV[triangle[0]][0], ndcV[triangle[1]][1] - ndcV[triangle[0]][1], ndcV[triangle[1]][2] - ndcV[triangle[0]][2]];
+        const edge2 = [ndcV[triangle[2]][0] - ndcV[triangle[0]][0], ndcV[triangle[2]][1] - ndcV[triangle[0]][1], ndcV[triangle[2]][2] - ndcV[triangle[0]][2]];
+        return normalizeVector(crossProductVectors(edge2, edge1));
     });
 
+    const mvpMatrix = productMatrices(productMatrices(modelMatrix, renderer.viewMatrix), renderer.proectionMatrix);
+    const mvpV = renderer.geometry.vertices.map(row => row.slice());
+    mvpV.forEach((_,i,list)=>{
+        list[i] = transformVertex(list[i], mvpMatrix);
+    });
+    
     // Проводим проекцию вершин и дополняем информацию о каждой вершине интенсивностью в ней
-    modelV.forEach((_,i,list)=>{
+    mvpV.forEach((_,i,list)=>{
         list[i] = proectVertexOnScreen(renderer,list[i]);
-        list[i].push(getColorIntensity(normalV[i], renderer.viewDirection, renderer.lightDirection));
+        list[i].push(getColorIntensity(normalV[i], viewDirection, renderer.lightDirection));
     });
-
+    
     for (let i = 0; i < triangles.length; ++i) {
         const i1 = triangles[i][0];
         const i2 = triangles[i][1];
         const i3 = triangles[i][2];
 
-        // Проверяем угол между нормалями треугольника и направления взгляда
-        // cosA = (a*b)/(|a|*|b|)
-        // Angle = arccos(cosA)
-        const angle = Math.abs( Math.acos(
-                    dotProductVectors(normalT[i], renderer.viewDirection) /             //  (a*b)
-                    (lengthVector(normalT[i]) * lengthVector(renderer.viewDirection))));// |a|*|b|
-        if (angle > Math.PI/2) { // Этот треугольник не виден
+        // Проверяем сонаправленость векторов нормали треугольника и направления взгляда
+        if (dotProductVectors(normalT[i], viewDirection) > 0) { // Этот треугольник не виден
             continue;
         }
+
         // Отрисовываем треугольник
-        drawBetweenTwoEdges(ctx, [modelV[i1],modelV[i2]], [modelV[i1],modelV[i3]]);
-        drawBetweenTwoEdges(ctx, [modelV[i1],modelV[i2]], [modelV[i2],modelV[i3]]);
-        drawBetweenTwoEdges(ctx, [modelV[i1],modelV[i3]], [modelV[i2],modelV[i3]]);
+        drawBetweenTwoEdges(renderer, [mvpV[i1],mvpV[i2]], [mvpV[i1],mvpV[i3]]);
+        drawBetweenTwoEdges(renderer, [mvpV[i1],mvpV[i2]], [mvpV[i2],mvpV[i3]]);
+        drawBetweenTwoEdges(renderer, [mvpV[i1],mvpV[i3]], [mvpV[i2],mvpV[i3]]);
     }
 }
 
