@@ -1,5 +1,5 @@
-import { getXbyY, linearInterpolation, productMatrices } from "./mathematic.js";
-import { proectVertexOnScreen, transformVertex } from "./renderer.js";
+import { getXbyY, linearInterpolation, productMatrices } from "./Mathematic.js";
+import { proectVertexOnScreen, transformVertex } from "./Renderer.js";
 
 // Закрашивает пространство между двумя отрезками e0 и e1
 // renderer - параметры для отрисовки на дисплей

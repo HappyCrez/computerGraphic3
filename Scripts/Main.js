@@ -3,16 +3,15 @@ import {
     setupCanvas, 
     setupScene,
     updateScene 
-} from './renderer.js';
+} from './Renderer.js';
 
-import { setupEventListeners } from './listeners.js'
+import { setupEventListeners } from './Listeners.js'
 
 async function init() {
     try {
         // Показываем индикатор загрузки
         const loadingElement = document.getElementById('loading');
         const canvas = document.getElementById('canvas');
-        const infoElement = document.getElementById('info-block');
         
         // Создаем и настраиваем рендерер
         const renderer = createRenderer();
@@ -27,7 +26,6 @@ async function init() {
         // Скрываем индикатор загрузки и показываем canvas и информацию
         loadingElement.style.display = 'none';
         canvas.style.display = 'block';
-        infoElement.style.display = 'block';
         
         // Запускаем анимацию -> отрисовка сцены
         updateScene(renderer);

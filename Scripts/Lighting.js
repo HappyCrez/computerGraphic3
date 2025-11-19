@@ -1,4 +1,4 @@
-import { dotProductVectors } from './mathematic.js';
+import { dotProductVectors } from './Mathematic.js';
 
 // Считает интенсивность цвета для нормали vertexNormal
 // normal - нормализованный вектор нормали треугольника

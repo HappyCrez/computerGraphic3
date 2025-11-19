@@ -1,4 +1,4 @@
-import { crossProductVectors, deg2rad, normalizeVector } from './mathematic.js';
+import { crossProductVectors, deg2rad, normalizeVector } from './Mathematic.js';
 
 export function generateRotationFigure(curvePoints, segments) {
     if (!curvePoints || curvePoints.length < 2) {

@@ -1,6 +1,6 @@
-import { generateRotationFigure, calculateNormalsInVerteces } from './geometry.js';
-import { getColorIntensity } from './lighting.js';
-import { drawAxios, drawBetweenTwoEdges } from './draw.js';
+import { generateRotationFigure, calculateNormalsInVerteces } from './Geometry.js';
+import { getColorIntensity } from './Lighting.js';
+import { drawAxios, drawBetweenTwoEdges } from './Draw.js';
 import {
     productMatrices,
     dotProductVectors,
@@ -10,7 +10,7 @@ import {
     normalizeVector,
     identityMatrix,
     deg2rad
-} from './mathematic.js';
+} from './Mathematic.js';
 
 export function createRenderer() {
     const canvas = document.getElementById('canvas');
