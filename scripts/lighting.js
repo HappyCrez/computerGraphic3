@@ -4,7 +4,7 @@ import { dotProductVectors } from './mathematic.js';
 // normal - нормализованный вектор нормали треугольника
 // viewDirection - нормализованный вектор направления взгляда (от камеры к объекту)
 // lightDirection - нормализованный вектор направления света 
-export function getColorIntensity(normal, viewDirection, lightDirection) {
+export function getColorIntensity(normal, viewDirection, lightDirection, lightI) {
     const ambient = 0.2; // Коэффициент окружающего освещения
     const diffuse = 0.7; // Коэффициент "матовости"
     const specular = 0.3; // Коэффициент зеркальности (шерховатость поверхности)
@@ -25,5 +25,5 @@ export function getColorIntensity(normal, viewDirection, lightDirection) {
     const specularFactor = Math.pow(specularDot, phoeng); // cos^p
     
     // Итоговая интенсивность
-    return ambient + diffuse * lightDot + specular * specularFactor;
+    return ambient + lightI * diffuse * lightDot + lightI * specular * specularFactor;
 }

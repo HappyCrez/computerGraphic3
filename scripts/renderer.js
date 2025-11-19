@@ -31,6 +31,7 @@ export function createRenderer() {
         geometry: null,
         normals: null,
         lightDirection: normalizeVector([2,2,-1]),
+        lightI: 1,
 
         rotationX: 30,
         rotationY: 30,
@@ -178,7 +179,7 @@ export function render(renderer) {
     // Проводим проекцию вершин и дополняем информацию о каждой вершине интенсивностью в ней
     mvpV.forEach((_,i,list)=>{
         list[i] = proectVertexOnScreen(renderer,list[i]);
-        list[i].push(getColorIntensity(normalV[i], viewDirection, renderer.lightDirection));
+        list[i].push(getColorIntensity(normalV[i], viewDirection, renderer.lightDirection, renderer.lightI));
     });
     
     for (let i = 0; i < triangles.length; ++i) {
