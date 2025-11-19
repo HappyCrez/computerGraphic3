@@ -147,5 +147,5 @@ export function linearInterpolation(v, points) {
     const t = (vx * dx + vy * dy) / lengthSq;
     
     // Линейная интерполяция
-    return (1 - t) * I0 + t * I1;
+    return (I1-I0)*t + I0;
 }
