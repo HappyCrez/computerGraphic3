@@ -102,17 +102,29 @@ export function setupCanvas(renderer) {
 // circles - количество точек окружности в одной четверти графика
 // array - выходной параметр (набор точек окружности)
 function generateSphere(circles, array) {
-    for (let i = -circles/2; i <= circles/2; i++) {
+    for (let i = -circles/2; i <= circles/2; ++i) {
         const angle = (i * Math.PI) / circles; // от 0 до π радиан
-        const x = Math.cos(angle);
-        const y = Math.sin(angle);
-        array.push([x, y]);
+        array.push([Math.cos(angle), Math.sin(angle)]);
+    }
+}
+
+function generateRectangle(squares, size, array) {
+    const [width, height] = size;
+    for (let i = 0; i <= squares; ++i) {
+        array.push([i/squares/2*width, -height/2]);
+    }
+    for (let i = 0; i < squares; ++i) {
+        array.push([width/2, i/squares-height/2]);
+    }
+    for (let i = squares; i >= 0; --i) {
+        array.push([i/squares/2*width, height/2]);
     }
 }
 
 // Создает фигуру для мира
 export function setupScene(renderer) {
     const curvePoints = [];
+    // generateRectangle(36, [2,4], curvePoints);
     generateSphere(36, curvePoints);
 
     renderer.geometry = generateRotationFigure(curvePoints, 36);

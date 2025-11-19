@@ -1,4 +1,4 @@
-import { updateScene } from "./renderer.js";
+import { setupCanvas, updateScene } from "./renderer.js";
 
 // Обработка событий окна
 export function setupEventListeners(renderer) {
