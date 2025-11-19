@@ -108,23 +108,9 @@ function generateSphere(circles, array) {
     }
 }
 
-function generateRectangle(squares, size, array) {
-    const [width, height] = size;
-    for (let i = 0; i <= squares; ++i) {
-        array.push([i/squares/2*width, -height/2]);
-    }
-    for (let i = 0; i < squares; ++i) {
-        array.push([width/2, i/squares-height/2]);
-    }
-    for (let i = squares; i >= 0; --i) {
-        array.push([i/squares/2*width, height/2]);
-    }
-}
-
 // Создает фигуру для мира
 export function setupScene(renderer) {
     const curvePoints = [];
-    // generateRectangle(36, [2,4], curvePoints);
     generateSphere(36, curvePoints);
 
     renderer.geometry = generateRotationFigure(curvePoints, 36);
